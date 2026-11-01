@@ -1,0 +1,15 @@
+[OPS-4471] Can't log into billing portal since password reset   Edit   Assign   More v
+Status: OPEN   Resolution: Unresolved   Component/s: Billing Portal   Labels: none
+Reporter: jchen (Jenny Chen, Northwind Traders)     Created: 29/Oct/26 4:52 PM
+
+Description
+hey so after the forced pw reset on tuesday i cant get into the billing portal anymore.
+steps: go to billing.example.com -> enter email + NEW password -> spinner for ~30s -> "Error 502 bad gateway"
+tried chrome + edge, cleared cookies, same thing. colleague (Raj) has the same problem.
+we need to download the october invoices for month-end close which is monday nov 2nd so pls hurry
+not super urgent otherwise but kinda annoying tbh
+
+Attachments: screenshot_502.png (184 kB)
+
+Activity:  All | Comments | Work log | History
+--- no comments yet ---
