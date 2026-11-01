@@ -27,8 +27,8 @@ from typing import Annotated, Optional
 
 import typer
 
-from extraction import (DEFAULT_BASE_URL, DEFAULT_INPUT_PRICE, DEFAULT_MODEL, DEFAULT_OUTPUT_PRICE, ExtractionError,
-                        ExtractionPipeline, LLMClient, Pricing, get_writer)
+from extraction import (DEFAULT_BASE_URL, DEFAULT_INPUT_PRICE, DEFAULT_MODEL, DEFAULT_OUTPUT_PRICE,
+                        DEFAULT_REASONING_EFFORT, ExtractionError, ExtractionPipeline, LLMClient, Pricing, get_writer)
 
 
 class InputType(str, Enum):
@@ -44,8 +44,15 @@ class OutputFormat(str, Enum):
     csv = "csv"
 
 
+class ReasoningEffort(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
 def log(msg):
-    print(msg, file=sys.stderr)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{stamp} {msg}", file=sys.stderr)
 
 
 def mask(secret):
@@ -72,6 +79,8 @@ def main(
         min=0, help="USD per 1M input tokens (default: DeepSeek V4 Flash)")] = DEFAULT_INPUT_PRICE,
     output_price: Annotated[float, typer.Option(
         min=0, help="USD per 1M output tokens (default: DeepSeek V4 Flash)")] = DEFAULT_OUTPUT_PRICE,
+    reasoning_effort: Annotated[ReasoningEffort, typer.Option(
+        help="How much the model reasons before answering; low is fastest")] = ReasoningEffort(DEFAULT_REASONING_EFFORT),
 ):
     """Turn a messy email, log or ticket into structured data."""
     # Parameters go to stderr so stdout stays clean for piping the extracted data
@@ -86,13 +95,15 @@ def main(
         "today": today,
         "input_price": f"${input_price:.2f}/1M tokens",
         "output_price": f"${output_price:.2f}/1M tokens",
+        "reasoning_effort": reasoning_effort.value,
     }
     width = max(map(len, params))
     for name, value in params.items():
         log(f"[param] {name:<{width}} = {value}")
 
     pricing =Pricing(input_per_million=input_price, output_per_million=output_price)
-    pipeline = ExtractionPipeline(LLMClient(model=model, base_url=base_url, api_key=api_key, pricing=pricing))
+    pipeline = ExtractionPipeline(LLMClient(model=model, base_url=base_url, api_key=api_key, pricing=pricing,
+                                            reasoning_effort=reasoning_effort.value))
 
     text = file.read_text(encoding="utf-8", errors="replace")
     try:
@@ -103,9 +114,9 @@ def main(
 
     for call in result.calls:
         log(f"[call] {call.step}: {call.model}, {call.input_tokens} in + {call.output_tokens} out tokens,"
-            f" ${call.cost:.6f}")
+            f" ${call.cost:.6f}, {call.duration_s:.1f}s")
     log(f"[ok] {file}: {result.kind} ({len(result.calls)} call(s), {result.total_tokens} tokens,"
-        f" ${result.total_cost:.6f})")
+        f" ${result.total_cost:.6f}, {sum(c.duration_s for c in result.calls):.1f}s)")
 
     writer = get_writer(output_format.value)
     if output:

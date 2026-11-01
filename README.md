@@ -35,6 +35,7 @@ python extract_cli.py samples/app.log --type log
 | `--model` | `gpt-oss:20b` | Model name |
 | `--base-url` | `http://localhost:11434/v1` | API endpoint |
 | `--api-key` | `ollama` | Or set `OPENAI_API_KEY` |
+| `--reasoning-effort` | `low` | `low`, `medium`, `high`; low is fastest, high is more accurate |
 | `--input-price` / `--output-price` | `0.30` / `1.20` | USD per 1M tokens ([DeepSeek V4 Flash](https://api-docs.deepseek.com/quick_start/pricing)); prints each call's cost to stderr |
 
 ## Switching models
