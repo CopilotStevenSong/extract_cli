@@ -28,8 +28,8 @@ class Extractor:
         return self.prompt + RULES.format(today=today)
 
     def extract(self, text, today):
-        """Returns (record, usage) where record is an instance of self.schema."""
-        return self.llm.parse(self.system_prompt(today), text, self.schema)
+        """Returns (record, CallCost) where record is an instance of self.schema."""
+        return self.llm.parse(self.system_prompt(today), text, self.schema, step="extract")
 
 
 class EmailExtractor(Extractor):
@@ -61,6 +61,6 @@ class KindDetector:
         self.llm = llm
 
     def detect(self, text):
-        """Returns (kind, usage)."""
-        result, usage = self.llm.parse(self.prompt, text[:DETECT_CHARS], DocKind)
-        return result.kind, usage
+        """Returns (kind, CallCost)."""
+        result, call = self.llm.parse(self.prompt, text[:DETECT_CHARS], DocKind, step="detect")
+        return result.kind, call

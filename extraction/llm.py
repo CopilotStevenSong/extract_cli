@@ -2,6 +2,8 @@
 import openai
 from openai import OpenAI
 
+from .cost import CallCost, Pricing
+
 DEFAULT_MODEL = "gpt-oss:20b"
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 
@@ -11,12 +13,16 @@ class ExtractionError(Exception):
 
 
 class LLMClient:
-    def __init__(self, model=DEFAULT_MODEL, base_url=DEFAULT_BASE_URL, api_key="ollama"):
+    def __init__(self, model=DEFAULT_MODEL, base_url=DEFAULT_BASE_URL, api_key="ollama", pricing=None):
         self.model = model
+        self.pricing = pricing or Pricing()
         self._client = OpenAI(base_url=base_url, api_key=api_key)  # Ollama ignores the key
 
-    def parse(self, system, text, schema):
-        """Ask for a reply matching `schema`; returns (parsed model, usage)."""
+    def parse(self, system, text, schema, step):
+        """Ask for a reply matching `schema`; returns (parsed model, CallCost).
+
+        `step` names the call (e.g. "detect", "extract") in the cost breakdown.
+        """
         # parse() turns the Pydantic model into a strict json_schema
         # response_format and validates the reply back into that model
         try:
@@ -41,4 +47,4 @@ class LLMClient:
             raise ExtractionError(f"model refused: {message.refusal}")
         if message.parsed is None:
             raise ExtractionError("model returned no parseable JSON")
-        return message.parsed, response.usage
+        return message.parsed, CallCost.from_usage(step, self.model, response.usage, self.pricing)

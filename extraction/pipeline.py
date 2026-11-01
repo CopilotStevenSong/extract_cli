@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from .cost import CallCost
 from .extractors import EXTRACTORS, KindDetector
 from .llm import ExtractionError
 
@@ -13,15 +14,15 @@ class ExtractionResult:
     source: str
     kind: str
     record: BaseModel
-    usages: list = field(default_factory=list)
-
-    @property
-    def calls(self):
-        return len(self.usages)
+    calls: list[CallCost] = field(default_factory=list)
 
     @property
     def total_tokens(self):
-        return sum(u.total_tokens for u in self.usages if u)
+        return sum(c.total_tokens for c in self.calls)
+
+    @property
+    def total_cost(self):
+        return sum(c.cost for c in self.calls)
 
     def to_dict(self):
         return {"source": self.source, "kind": self.kind, "data": self.record.model_dump(mode="json")}
@@ -41,13 +42,13 @@ class ExtractionPipeline:
             raise ExtractionError("input is empty")
         today = today or datetime.date.today().isoformat()
 
-        usages = []
+        calls = []
         if kind == "auto":
-            kind, usage = self.detector.detect(text)
-            usages.append(usage)
+            kind, call = self.detector.detect(text)
+            calls.append(call)
         if kind not in self.extractors:
             raise ExtractionError(f"unknown kind {kind!r}; expected one of {self.kinds}")
 
-        record, usage = self.extractors[kind].extract(text, today)
-        usages.append(usage)
-        return ExtractionResult(source, kind, record, usages)
+        record, call = self.extractors[kind].extract(text, today)
+        calls.append(call)
+        return ExtractionResult(source, kind, record, calls)

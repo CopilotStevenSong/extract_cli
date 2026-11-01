@@ -27,7 +27,8 @@ from typing import Annotated, Optional
 
 import typer
 
-from extraction import DEFAULT_BASE_URL, DEFAULT_MODEL, ExtractionError, ExtractionPipeline, LLMClient, get_writer
+from extraction import (DEFAULT_BASE_URL, DEFAULT_INPUT_PRICE, DEFAULT_MODEL, DEFAULT_OUTPUT_PRICE, ExtractionError,
+                        ExtractionPipeline, LLMClient, Pricing, get_writer)
 
 
 class InputType(str, Enum):
@@ -62,9 +63,14 @@ def main(
         envvar="OPENAI_API_KEY", help="Ollama ignores the key")] = "ollama",
     today: Annotated[str, typer.Option(
         help="Reference date for relative dates like 'next Friday'")] = datetime.date.today().isoformat(),
+    input_price: Annotated[float, typer.Option(
+        min=0, help="USD per 1M input tokens (default: DeepSeek V4 Flash)")] = DEFAULT_INPUT_PRICE,
+    output_price: Annotated[float, typer.Option(
+        min=0, help="USD per 1M output tokens (default: DeepSeek V4 Flash)")] = DEFAULT_OUTPUT_PRICE,
 ):
     """Turn a messy email, log or ticket into structured data."""
-    pipeline = ExtractionPipeline(LLMClient(model=model, base_url=base_url, api_key=api_key))
+    pricing = Pricing(input_per_million=input_price, output_per_million=output_price)
+    pipeline = ExtractionPipeline(LLMClient(model=model, base_url=base_url, api_key=api_key, pricing=pricing))
 
     text = file.read_text(encoding="utf-8", errors="replace")
     try:
@@ -73,7 +79,11 @@ def main(
         log(f"[error] {file}: {e}")
         raise typer.Exit(1)
 
-    log(f"[ok] {file}: {result.kind} ({result.calls} call(s), {result.total_tokens} tokens)")
+    for call in result.calls:
+        log(f"[call] {call.step}: {call.model}, {call.input_tokens} in + {call.output_tokens} out tokens,"
+            f" ${call.cost:.6f}")
+    log(f"[ok] {file}: {result.kind} ({len(result.calls)} call(s), {result.total_tokens} tokens,"
+        f" ${result.total_cost:.6f})")
 
     writer = get_writer(output_format.value)
     if output:
