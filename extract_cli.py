@@ -48,6 +48,11 @@ def log(msg):
     print(msg, file=sys.stderr)
 
 
+def mask(secret):
+    """Hide all but the last 4 characters of an API key."""
+    return "*" * max(len(secret) - 4, 0) + secret[-4:] if len(secret) > 8 else "*" * len(secret)
+
+
 def main(
     file: Annotated[Path, typer.Argument(
         exists=True, dir_okay=False, readable=True, help="Input file to extract from")],
@@ -69,7 +74,24 @@ def main(
         min=0, help="USD per 1M output tokens (default: DeepSeek V4 Flash)")] = DEFAULT_OUTPUT_PRICE,
 ):
     """Turn a messy email, log or ticket into structured data."""
-    pricing = Pricing(input_per_million=input_price, output_per_million=output_price)
+    # Parameters go to stderr so stdout stays clean for piping the extracted data
+    params = {
+        "file": file,
+        "type": input_type.value,
+        "format": output_format.value,
+        "output": output or "stdout",
+        "model": model,
+        "base_url": base_url,
+        "api_key": mask(api_key),
+        "today": today,
+        "input_price": f"${input_price:.2f}/1M tokens",
+        "output_price": f"${output_price:.2f}/1M tokens",
+    }
+    width = max(map(len, params))
+    for name, value in params.items():
+        log(f"[param] {name:<{width}} = {value}")
+
+    pricing =Pricing(input_per_million=input_price, output_per_million=output_price)
     pipeline = ExtractionPipeline(LLMClient(model=model, base_url=base_url, api_key=api_key, pricing=pricing))
 
     text = file.read_text(encoding="utf-8", errors="replace")
